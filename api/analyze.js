@@ -190,3 +190,4 @@ export default async function handler(req, res) {
     message: `การเชื่อมต่อ Gemini AI ขัดข้อง: ${lastErrorDetail || 'ไม่สามารถติดต่อเซิร์ฟเวอร์ AI ได้'}`
   });
 }
+
