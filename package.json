@@ -1,8 +1,8 @@
 {
-  "name": "valentine",
+  "name": "hemacalc-ai",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Clinical Hematology RBC Indices Calculator & AI Assistant",
+  "main": "index.html",
   "type": "module",
   "scripts": {
     "dev": "vite",

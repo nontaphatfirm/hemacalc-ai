@@ -1,19 +1,17 @@
 /**
  * Gemini API Integration & Clinical Hematology Expert Consultation Engine
+ * Supports both Client-side API Key & Serverless Central Proxy with Quota Control
  */
 
 const STORAGE_KEY_API = 'gemini_api_key_hematology';
 const STORAGE_KEY_MODEL = 'gemini_selected_model';
-const DEFAULT_MODEL = 'gemini-3.8-flash';
+const DEFAULT_MODEL = 'gemini-2.0-flash';
 
 export const AVAILABLE_MODELS = [
-  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (แนะนำล่าสุด - ประสิทธิภาพและตรรกะสูงสุด)' },
-  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (ประมวลผลเร็วพิเศษ)' },
-  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite (เร็ว เบา ประหยัดโทเคน)' },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (เสถียรและเร็วสูง)' },
-  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (มาตรฐาน)' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (วิเคราะห์เชิงลึก)' }
+  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (แนะนำล่าสุด - รวดเร็วและแม่นยำสูง)' },
+  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (เสถียร ประหยัดโทเคน)' },
+  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (การวิเคราะห์เชิงลึกขั้นสูง)' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (รุ่นทดลองล่าสุด)' }
 ];
 
 export function getStoredApiKey() {
@@ -81,14 +79,9 @@ export function buildHematologyPrompt(calcData) {
 }
 
 /**
- * Sends prompt to Google Gemini API
+ * Direct call from client if user provides personal API Key
  */
-export async function consultGeminiAPI(calcData, apiKey, model = DEFAULT_MODEL) {
-  if (!apiKey) {
-    throw new Error('ไม่พบ API Key ของ Gemini กรุณาคลิกปุ่ม "ตั้งค่า API Key" เพื่อใส่คีย์ของคุณ');
-  }
-
-  const promptText = buildHematologyPrompt(calcData);
+async function callGeminiDirectly(promptText, apiKey, model) {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
 
   const payload = {
@@ -107,9 +100,7 @@ export async function consultGeminiAPI(calcData, apiKey, model = DEFAULT_MODEL) 
 
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
 
@@ -123,9 +114,11 @@ export async function consultGeminiAPI(calcData, apiKey, model = DEFAULT_MODEL) 
     }
 
     if (response.status === 400 || response.status === 403) {
-      throw new Error(`API Key ไม่ถูกต้อง หรือไม่มีสิทธิ์เข้าถึงโมเดล (${errorDetail})`);
+      throw new Error(`API Key ส่วนตัวไม่ถูกต้อง หรือไม่มีสิทธิ์เข้าถึงโมเดล (${errorDetail})`);
     } else if (response.status === 429) {
-      throw new Error(`เกินขีดจำกัดการใช้งาน API (Quota Exceeded) กรุณารอสักครู่แล้วลองใหม่`);
+      const err = new Error('API Key ส่วนตัวของคุณเกินขีดจำกัดการใช้งาน (Quota Exceeded) กรุณารอสักครู่');
+      err.isQuotaLimit = true;
+      throw err;
     } else {
       throw new Error(`การเชื่อมต่อ Gemini API ล้มเหลว (${response.status}): ${errorDetail}`);
     }
@@ -138,12 +131,67 @@ export async function consultGeminiAPI(calcData, apiKey, model = DEFAULT_MODEL) 
     throw new Error('ไม่ได้รับข้อความตอบกลับจากโมเดล Gemini');
   }
 
-  return candidate.content.parts[0].text;
+  return {
+    text: candidate.content.parts[0].text,
+    source: 'custom_key'
+  };
+}
+
+/**
+ * Central Serverless Call via /api/analyze (Vercel)
+ */
+async function callCentralProxy(promptText, model) {
+  const response = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: promptText, model })
+  });
+
+  if (!response.ok) {
+    let errJson = null;
+    try {
+      errJson = await response.json();
+    } catch {
+      //
+    }
+
+    const message = errJson?.message || `เกิดข้อผิดพลาดจากเซิร์ฟเวอร์ (${response.status})`;
+    const err = new Error(message);
+    err.status = response.status;
+    err.errorCode = errJson?.error;
+    err.isQuotaLimit = response.status === 429 || errJson?.error === 'quota_exhausted' || errJson?.error === 'rate_limited';
+    err.isNoCentralKey = errJson?.error === 'no_central_key';
+    throw err;
+  }
+
+  const data = await response.json();
+  return {
+    text: data.text,
+    source: 'central_key',
+    remainingRequests: data.remainingRequests
+  };
+}
+
+/**
+ * Main Consultation function:
+ * 1. If user has custom key -> uses custom key directly
+ * 2. If no custom key -> calls central /api/analyze
+ */
+export async function consultGeminiAPI(calcData, userApiKey = '', model = DEFAULT_MODEL) {
+  const promptText = buildHematologyPrompt(calcData);
+
+  // If user provided their own key
+  if (userApiKey && userApiKey.trim()) {
+    return await callGeminiDirectly(promptText, userApiKey.trim(), model);
+  }
+
+  // Otherwise, route through Central API Proxy on Vercel
+  return await callCentralProxy(promptText, model);
 }
 
 /**
  * Offline Expert Hematology Diagnostic Engine
- * Provides immediate high-value clinical interpretation when API key is not yet configured or offline
+ * Provides immediate high-value clinical interpretation when API key / central quota is unavailable
  */
 export function generateOfflineExpertAnalysis(calcData) {
   const { inputs, indices, demoRef, evaluations, morphology } = calcData;
@@ -254,7 +302,7 @@ export function generateOfflineExpertAnalysis(calcData) {
     report += `- ผลเลือดอยู่ในเกณฑ์ที่น่าพึงพอใจ ควรตรวจติดตามสุขภาพสม่ำเสมอและรักษาสุขอนามัยที่ดี\n`;
   }
 
-  report += `\n> *(หมายเหตุ: บทวิเคราะห์นี้ถูกประมวลผลจากระบบผู้เชี่ยวชาญโลหิตวิทยาอัตโนมัติ เพื่อการเรียนรู้และการคำนวณเบื้องต้น)*`;
+  report += `\n> *(หมายเหตุ: บทวิเคราะห์นี้ประมวลผลจากระบบผู้เชี่ยวชาญโลหิตวิทยาอัตโนมัติ เพื่อการเรียนรู้และการคำนวณเบื้องต้น)*`;
 
   return report;
 }

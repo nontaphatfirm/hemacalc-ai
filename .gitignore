@@ -1,1 +1,20 @@
+# Dependencies
 node_modules/
+
+# Production build output
+dist/
+
+# Local Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Archives and binaries
+*.zip
+*.tar.gz
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

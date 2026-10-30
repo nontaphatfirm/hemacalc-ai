@@ -47,11 +47,18 @@
       </div>
 
       <div class="header-actions">
+        <!-- Local History Button -->
+        <button id="btn-open-history" class="btn-history-pill" title="ดูประวัติผลการตรวจที่บันทึกไว้ในเครื่อง">
+          <span class="history-pill-icon" aria-hidden="true">📋</span>
+          <span>ประวัติการตรวจ</span>
+          <span class="badge-count" id="history-badge-count">0</span>
+        </button>
+
         <!-- API Key Status Pill -->
-        <button id="btn-open-api-modal" class="btn-api-status" title="คลิกเพื่อตั้งค่า Gemini API Key">
+        <button id="btn-open-api-modal" class="btn-api-status" title="คลิกเพื่อตั้งค่า Gemini API">
           <span class="api-dot" id="api-status-dot"></span>
-          <span id="api-status-text">ตั้งค่า Gemini API</span>
-          <span class="key-icon" aria-hidden="true">🔑</span>
+          <span id="api-status-text">AI กลาง: พร้อมใช้งาน</span>
+          <span class="key-icon" aria-hidden="true">✨</span>
         </button>
 
         <!-- Theme Toggle -->
@@ -286,6 +293,9 @@
             </div>
             
             <div class="result-actions" id="result-toolbar" style="display: none;">
+              <button id="btn-save-record" type="button" class="btn-sm btn-ghost" title="บันทึกผลการตรวจนี้ลงในประวัติของเครื่อง">
+                💾 บันทึกประวัติ
+              </button>
               <button id="btn-copy-report" type="button" class="btn-sm btn-ghost" title="คัดลอกสรุปผลการตรวจ">
                 📋 คัดลอกผล
               </button>
@@ -512,16 +522,23 @@
           <div class="modal-title-with-icon">
             <span class="modal-icon">⚙️</span>
             <div>
-              <h3 class="modal-title">ตั้งค่า Google Gemini API</h3>
-              <p class="modal-subtitle">บันทึกใน LocalStorage ของเบราว์เซอร์ส่วนตัวของคุณ ปลอดภัย 100%</p>
+              <h3 class="modal-title">ตั้งค่าการเชื่อมต่อ Gemini AI</h3>
+              <p class="modal-subtitle">ระบบมี AI กลางให้บริการฟรี หรือใส่ API Key ส่วนตัวเพื่อการใช้งานไม่จำกัด</p>
             </div>
           </div>
           <button type="button" class="btn-close-modal" id="btn-close-api-modal" aria-label="ปิด">✕</button>
         </div>
         <div class="modal-body">
-          <div class="form-group">
+          <div class="api-notice-box">
+            <span class="notice-icon">🌐</span>
+            <div class="notice-text">
+              <strong>ระบบมี AI กลางเปิดให้ทดลองใช้ฟรี:</strong> หากไม่ใส่คีย์ ระบบจะเรียกใช้ AI กลางผ่านเซิร์ฟเวอร์โดยอัตโนมัติ (จำกัด 25 ครั้ง/ชม. ต่อผู้ใช้ เพื่อป้องกันโควต้าหมด)
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 1rem;">
             <label for="modal-input-api-key" class="form-label">
-              <span>Gemini API Key</span>
+              <span>Gemini API Key ส่วนตัว (ไม่บังคับ)</span>
               <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="link-external">
                 รับคีย์ฟรีจาก Google AI Studio ↗
               </a>
@@ -531,42 +548,77 @@
                 type="password" 
                 id="modal-input-api-key" 
                 class="form-control" 
-                placeholder="AIzaSy..." 
+                placeholder="เว้นว่างไว้เพื่อใช้ AI กลางฟรี หรือใส่ AIzaSy..." 
                 autocomplete="off"
               >
               <button type="button" id="btn-toggle-key-visibility" class="btn-suffix-action" title="แสดง/ซ่อนคีย์">
                 👁️
               </button>
             </div>
-            <span class="form-hint">หากเว้นว่างไว้ ระบบจะใช้โหมด Offline Hematology Expert วิเคราะห์ให้โดยอัตโนมัติ</span>
+            <span class="form-hint">หากโควต้ากลางของระบบเต็ม สามารถใส่คีย์ส่วนตัวเพื่อใช้งานต่อได้ทันที</span>
           </div>
 
           <div class="form-group">
             <label for="modal-select-model" class="form-label">โมเดล AI ที่ต้องการใช้งาน</label>
             <select id="modal-select-model" class="form-control select-control">
-              <option value="gemini-3.8-flash">Gemini 3.8 Flash (แนะนำล่าสุด - ประสิทธิภาพและตรรกะสูงสุด)</option>
-              <option value="gemini-3.6-flash">Gemini 3.6 Flash (ประมวลผลเร็วพิเศษ)</option>
-              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite (เร็ว เบา ประหยัดโทเคน)</option>
-              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro (วิเคราะห์เชิงลึก)</option>
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash (แนะนำล่าสุด - รวดเร็วและแม่นยำสูง)</option>
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash (เสถียร ประหยัดโทเคน)</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro (วิเคราะห์เชิงลึกขั้นสูง)</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash (รุ่นทดลองล่าสุด)</option>
             </select>
           </div>
 
           <div class="api-modal-info">
             <div class="info-badge-row">
               <span class="info-badge-icon">🔒</span>
-              <p>คีย์ของคุณจะถูกเก็บไว้เฉพาะในเบราว์เซอร์ของคุณเท่านั้น ไม่มีการส่งไปเก็บบนเซิร์ฟเวอร์ภายนอกใดๆ ทั้งสิ้น</p>
+              <p>หากใส่คีย์ส่วนตัว คีย์จะถูกเก็บเฉพาะในเบราว์เซอร์ของคุณเท่านั้น ปลอดภัย 100%</p>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" id="btn-clear-api-key" class="btn btn-danger-outline">ลบคีย์ออกจากเครื่อง</button>
+          <button type="button" id="btn-clear-api-key" class="btn btn-danger-outline">ล้างคีย์ส่วนตัว (ใช้ AI กลาง)</button>
           <div class="modal-footer-right">
             <button type="button" class="btn btn-secondary" id="btn-cancel-api-modal">ยกเลิก</button>
             <button type="button" class="btn btn-primary" id="btn-save-api-key">บันทึกการตั้งค่า</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Local History Modal -->
+    <div class="modal-backdrop" id="history-modal" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-lg">
+        <div class="modal-header">
+          <div class="modal-title-with-icon">
+            <span class="modal-icon">📋</span>
+            <div>
+              <h3 class="modal-title">ประวัติผลการตรวจที่บันทึกไว้</h3>
+              <p class="modal-subtitle">ข้อมูลถูกเก็บไว้ในเครื่องของคุณ (Local Storage) ปลอดภัย 100% ไม่ส่งข้อมูลผู้ป่วยไปที่ใด</p>
+            </div>
+          </div>
+          <button type="button" class="btn-close-modal" id="btn-close-history" aria-label="ปิด">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="history-toolbar">
+            <div class="history-stats">
+              <span>บันทึกทั้งหมด: <strong id="history-total-count">0</strong> รายการ</span>
+            </div>
+            <div class="history-actions-row">
+              <button type="button" id="btn-export-history" class="btn-sm btn-ghost" title="ดาวน์โหลดประวัติเป็นไฟล์ JSON สำรองไว้">
+                📥 ส่งออก JSON
+              </button>
+              <button type="button" id="btn-clear-history" class="btn-sm btn-danger-ghost" title="ล้างประวัติทั้งหมดที่บันทึกไว้ในเครื่อง">
+                🗑️ ล้างทั้งหมด
+              </button>
+            </div>
+          </div>
+
+          <div id="history-list-container" class="history-list-container">
+            <!-- Dynamic History Cards inserted via JS -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-ok-history">ปิดหน้าต่าง</button>
         </div>
       </div>
     </div>
