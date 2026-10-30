@@ -91,7 +91,7 @@ export default async function handler(req, res) {
     }
   }
 
-  const { prompt, model = 'gemini-2.0-flash' } = body || {};
+  const { prompt, model = 'gemini-3.6-flash' } = body || {};
 
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({
@@ -103,9 +103,8 @@ export default async function handler(req, res) {
   // Models to attempt in order of priority (handles fallbacks)
   const candidateModels = [
     model,
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-2.5-flash'
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite'
   ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
   let lastErrorDetail = '';

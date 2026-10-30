@@ -5,13 +5,11 @@
 
 const STORAGE_KEY_API = 'gemini_api_key_hematology';
 const STORAGE_KEY_MODEL = 'gemini_selected_model';
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-3.6-flash';
 
 export const AVAILABLE_MODELS = [
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (แนะนำล่าสุด - รวดเร็วและแม่นยำสูง)' },
-  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (เสถียร ประหยัดโทเคน)' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (การวิเคราะห์เชิงลึกขั้นสูง)' },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (รุ่นทดลองล่าสุด)' }
+  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (ประมวลผลเร็วพิเศษ)' },
+  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite (เร็ว เบา ประหยัดโทเคน)' }
 ];
 
 export function getStoredApiKey() {
@@ -27,7 +25,11 @@ export function saveStoredApiKey(key) {
 }
 
 export function getStoredModel() {
-  return localStorage.getItem(STORAGE_KEY_MODEL) || DEFAULT_MODEL;
+  const stored = localStorage.getItem(STORAGE_KEY_MODEL);
+  if (stored && AVAILABLE_MODELS.some(m => m.id === stored)) {
+    return stored;
+  }
+  return DEFAULT_MODEL;
 }
 
 export function saveStoredModel(model) {
