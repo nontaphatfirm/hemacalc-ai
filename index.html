@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HemaCalc AI - ระบบคำนวณและแปลผลค่าดัชนีเม็ดเลือดแดง (RBC Indices Analyzer)</title>
+  <meta name="description" content="เว็บแอปพลิเคชันทางการแพทย์สำหรับคำนวณและแปลผลดัชนีเม็ดเลือดแดง (MCV, MCH, MCHC) พร้อมระบบ AI วิเคราะห์โรคและสาเหตุความผิดปกติด้วย Gemini API">
+  
+  <!-- Google Fonts: Prompt & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="logo-icon-wrap" aria-hidden="true">
+          <svg class="erythrocyte-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="18" cy="18" r="16" fill="url(#erythrocyte-grad)" filter="drop-shadow(0 4px 10px rgba(225, 29, 72, 0.4))" />
+            <ellipse cx="18" cy="18" rx="8" ry="7" fill="url(#indent-grad)" opacity="0.85" />
+            <circle cx="14" cy="14" r="3" fill="#ffffff" opacity="0.3" filter="blur(1px)" />
+            <defs>
+              <radialGradient id="erythrocyte-grad" cx="0.35" cy="0.3" r="0.75">
+                <stop offset="0%" stop-color="#ff4d6d" />
+                <stop offset="60%" stop-color="#e11d48" />
+                <stop offset="100%" stop-color="#881337" />
+              </radialGradient>
+              <radialGradient id="indent-grad" cx="0.5" cy="0.5" r="0.5">
+                <stop offset="0%" stop-color="#4c0519" />
+                <stop offset="70%" stop-color="#9f1239" />
+                <stop offset="100%" stop-color="#e11d48" />
+              </radialGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <h1 class="brand-title">HemaCalc AI</h1>
+            <span class="badge-version">v2.5 Clinical</span>
+          </div>
+          <p class="brand-subtitle">โปรแกรมคำนวณและแปลผลดัชนีเม็ดเลือดแดง (RBC Indices) เชื่อมต่อ Gemini API</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- API Key Status Pill -->
+        <button id="btn-open-api-modal" class="btn-api-status" title="คลิกเพื่อตั้งค่า Gemini API Key">
+          <span class="api-dot" id="api-status-dot"></span>
+          <span id="api-status-text">ตั้งค่า Gemini API</span>
+          <span class="key-icon" aria-hidden="true">🔑</span>
+        </button>
+
+        <!-- Theme Toggle -->
+        <button id="btn-theme-toggle" class="btn-icon" aria-label="สลับธีม สว่าง/มืด" title="สลับธีม">
+          <span id="theme-icon">🌙</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Quick Presets Bar -->
+    <section class="presets-section" aria-label="เคสตัวอย่างจำลองทางคลินิก">
+      <div class="presets-label">
+        <span class="preset-icon">📋</span>
+        <span>เคสตัวอย่างทางคลินิก:</span>
+      </div>
+      <div class="presets-grid" id="presets-container">
+        <!-- Generated dynamically or static quick buttons -->
+        <button type="button" class="preset-btn" data-preset="normal-male">
+          <span class="preset-tag normal">ปกติ</span>
+          <span class="preset-name">ชายวัยผู้ใหญ่ปกติ</span>
+        </button>
+        <button type="button" class="preset-btn" data-preset="iron-deficiency">
+          <span class="preset-tag alert">ขาดธาตุเหล็ก (IDA)</span>
+          <span class="preset-name">หญิง MCV เล็ก ซีด</span>
+        </button>
+        <button type="button" class="preset-btn" data-preset="thalassemia-trait">
+          <span class="preset-tag warning">พาหะธาลัสซีเมีย</span>
+          <span class="preset-name">MCV ต่ำ RBC สูง</span>
+        </button>
+        <button type="button" class="preset-btn" data-preset="pregnancy">
+          <span class="preset-tag info">หญิงตั้งครรภ์</span>
+          <span class="preset-name">ซีดสรีรวิทยา (Hemodilution)</span>
+        </button>
+        <button type="button" class="preset-btn" data-preset="macrocytic">
+          <span class="preset-tag purple">เม็ดเลือดขนาดใหญ่</span>
+          <span class="preset-name">ขาด B12 / Folate (MCV > 100)</span>
+        </button>
+        <button type="button" class="preset-btn" data-preset="pediatric">
+          <span class="preset-tag teal">เด็กปฐมวัย</span>
+          <span class="preset-name">เด็กอายุ 3 ปี</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Main Content Layout -->
+    <main class="main-layout">
+      <!-- Left Panel: Input Form -->
+      <section class="card form-card" aria-labelledby="form-heading">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-icon">🧪</span>
+            <div>
+              <h2 id="form-heading" class="card-title">ฟอร์มบันทึกข้อมูลผลเลือด</h2>
+              <p class="card-desc">กรอกค่าทางโลหิตวิทยาและข้อมูลผู้ป่วยเพื่อคำนวณดัชนี</p>
+            </div>
+          </div>
+          <button id="btn-formula-info" type="button" class="btn-text-icon" title="ดูสูตรคำนวณและที่มา">
+            ℹ️ สูตรคำนวณ
+          </button>
+        </div>
+
+        <form id="rbc-form" novalidate>
+          <div class="form-grid">
+            <!-- 1. Hemoglobin -->
+            <div class="form-group">
+              <label for="input-hb" class="form-label">
+                <span>ค่า Hemoglobin (Hb)</span>
+                <span class="unit-badge">g/dL</span>
+              </label>
+              <div class="input-wrapper">
+                <input 
+                  type="number" 
+                  id="input-hb" 
+                  name="hb" 
+                  class="form-control" 
+                  placeholder="เช่น 14.5" 
+                  step="0.1" 
+                  min="1" 
+                  max="30" 
+                  required
+                >
+                <span class="input-unit">g/dL</span>
+              </div>
+              <span class="form-hint">เกณฑ์ปกติผู้ใหญ่: 12.0 - 17.5 g/dL</span>
+            </div>
+
+            <!-- 2. Hematocrit -->
+            <div class="form-group">
+              <label for="input-hct" class="form-label">
+                <span>ค่า Hematocrit (Hct)</span>
+                <span class="unit-badge">%</span>
+              </label>
+              <div class="input-wrapper">
+                <input 
+                  type="number" 
+                  id="input-hct" 
+                  name="hct" 
+                  class="form-control" 
+                  placeholder="เช่น 43.5" 
+                  step="0.1" 
+                  min="5" 
+                  max="80" 
+                  required
+                >
+                <span class="input-unit">%</span>
+              </div>
+              <span class="form-hint">ปริมาตรเม็ดเลือดแดงอัดแน่นในเลือด</span>
+            </div>
+
+            <!-- 3. RBC Count -->
+            <div class="form-group full-width">
+              <label for="input-rbc-count" class="form-label">
+                <span>ค่า RBC Count</span>
+                <span class="label-notice">เมื่อ dilute 1:200 หน่วย cells ต่อ 5 ช่อง</span>
+              </label>
+              <div class="input-wrapper">
+                <input 
+                  type="number" 
+                  id="input-rbc-count" 
+                  name="rbcCount" 
+                  class="form-control" 
+                  placeholder="เช่น 480 (cells ต่อ 5 ช่อง)" 
+                  step="1" 
+                  min="10" 
+                  max="2000" 
+                  required
+                >
+                <span class="input-unit">cells / 5 ช่อง</span>
+              </div>
+              
+              <!-- Realtime converted preview indicator -->
+              <div class="rbc-conversion-pill" id="rbc-conversion-display">
+                <span class="convert-icon">🔄</span>
+                <span>แปลงหน่วยเป็น: <strong id="converted-rbc-val">0.00</strong> × 10⁶ / µL (หรือ 10¹² / L)</span>
+                <span class="formula-tag">สูตร: Count ÷ 100</span>
+              </div>
+            </div>
+
+            <!-- 4. Demographic: Age -->
+            <div class="form-group">
+              <label for="input-age" class="form-label">
+                <span>อายุ (Age)</span>
+                <span class="unit-badge">ปี</span>
+              </label>
+              <div class="input-wrapper">
+                <input 
+                  type="number" 
+                  id="input-age" 
+                  name="age" 
+                  class="form-control" 
+                  placeholder="เช่น 32" 
+                  step="1" 
+                  min="0" 
+                  max="120" 
+                  required
+                >
+                <span class="input-unit">ปี</span>
+              </div>
+              <span class="form-hint">เพื่อใช้เทียบช่วงค่าอ้างอิงเฉพาะวัย</span>
+            </div>
+
+            <!-- 5. Demographic: Sex -->
+            <div class="form-group">
+              <label class="form-label">
+                <span>เพศ (Sex)</span>
+              </label>
+              <div class="sex-toggle-group" role="radiogroup" aria-label="เลือกเพศ">
+                <label class="radio-card" id="label-sex-male">
+                  <input type="radio" name="sex" id="radio-sex-male" value="male" checked>
+                  <span class="radio-card-body">
+                    <span class="gender-symbol">👨</span>
+                    <span class="gender-text">ชาย (Male)</span>
+                  </span>
+                </label>
+                <label class="radio-card" id="label-sex-female">
+                  <input type="radio" name="sex" id="radio-sex-female" value="female">
+                  <span class="radio-card-body">
+                    <span class="gender-symbol">👩</span>
+                    <span class="gender-text">หญิง (Female)</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 6. Conditional: Pregnancy Option (Only when Sex = Female) -->
+            <div class="form-group full-width pregnancy-wrapper" id="pregnancy-container">
+              <div class="pregnancy-card">
+                <div class="pregnancy-info">
+                  <span class="pregnancy-icon">🤰</span>
+                  <div>
+                    <label for="check-pregnancy" class="pregnancy-title">ภาวะตั้งครรภ์ (Pregnancy Status)</label>
+                    <p class="pregnancy-desc">ตั้งครรภ์หรือไม่? (ปรับเกณฑ์ Hb/Hct ลดลงตามการเจือจางของเลือดในสตรีมีครรภ์)</p>
+                  </div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="check-pregnancy" name="isPregnant">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Form Actions -->
+          <div class="form-actions">
+            <button type="submit" id="btn-calculate" class="btn btn-primary">
+              <span class="btn-icon-inner">⚡</span>
+              <span>คำนวณและแปลผล</span>
+            </button>
+            <button type="button" id="btn-quick-ai" class="btn btn-gemini">
+              <span class="btn-icon-inner">✨</span>
+              <span>วิเคราะห์ด้วย Gemini AI</span>
+            </button>
+            <button type="button" id="btn-reset" class="btn btn-secondary">
+              <span class="btn-icon-inner">🔄</span>
+              <span>ล้างข้อมูล</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Right Panel: Results & AI Interpretation -->
+      <section class="results-column">
+        <!-- Results Card -->
+        <article class="card results-card" id="results-card" aria-live="polite">
+          <div class="card-header result-header-flex">
+            <div class="card-title-group">
+              <span class="card-icon">📊</span>
+              <div>
+                <h2 class="card-title">ตารางผลการคำนวณและดัชนีเม็ดเลือดแดง</h2>
+                <p class="card-desc" id="patient-summary-badge">รอการกรอกข้อมูลเพื่อคำนวณ...</p>
+              </div>
+            </div>
+            
+            <div class="result-actions" id="result-toolbar" style="display: none;">
+              <button id="btn-copy-report" type="button" class="btn-sm btn-ghost" title="คัดลอกสรุปผลการตรวจ">
+                📋 คัดลอกผล
+              </button>
+              <button id="btn-print-report" type="button" class="btn-sm btn-ghost" title="พิมพ์รายงาน หรือ บันทึกเป็น PDF">
+                🖨️ พิมพ์รายงาน
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty State (Before Calculation) -->
+          <div class="empty-state" id="empty-state-view">
+            <div class="empty-icon-wrap">🩸</div>
+            <h3>พร้อมประมวลผลดัชนีเม็ดเลือดแดง</h3>
+            <p>กรอกข้อมูล Hb, Hct, RBC Count และข้อมูลผู้ป่วย หรือคลิกเลือก <strong>"เคสตัวอย่างทางคลินิก"</strong> ด้านบนเพื่อทดสอบทันที</p>
+          </div>
+
+          <!-- Active Results View -->
+          <div id="active-results-view" style="display: none;">
+            <!-- Summary Table of Parameters & Indices -->
+            <div class="table-responsive">
+              <table class="results-table" id="indices-table">
+                <thead>
+                  <tr>
+                    <th scope="col">รายการตรวจ (Parameter)</th>
+                    <th scope="col">ค่าที่ได้ (Value)</th>
+                    <th scope="col">เกณฑ์อ้างอิงปกติ (Reference)</th>
+                    <th scope="col">สถานะแปลผล</th>
+                    <th scope="col" class="th-gauge">ระดับเปรียบเทียบ</th>
+                  </tr>
+                </thead>
+                <tbody id="indices-table-body">
+                  <!-- Populated dynamically via JS -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Morphologic Diagnosis & Mentzer Index Showcase -->
+            <div class="morphology-grid">
+              <!-- Morphology Card -->
+              <div class="morphology-card">
+                <div class="morph-header">
+                  <span class="morph-icon">🔬</span>
+                  <h4>การจำแนกสัณฐานวิทยาเม็ดเลือดแดง</h4>
+                </div>
+                <div class="morph-badges">
+                  <div class="morph-badge-item">
+                    <span class="morph-badge-label">ขนาดเม็ดเลือด (Size):</span>
+                    <span class="morph-badge-val" id="morph-size-val">-</span>
+                  </div>
+                  <div class="morph-badge-item">
+                    <span class="morph-badge-label">การติดสี (Chromasia):</span>
+                    <span class="morph-badge-val" id="morph-chromic-val">-</span>
+                  </div>
+                </div>
+                <div class="morph-summary-pill" id="morph-diagnosis-pill">
+                  -
+                </div>
+              </div>
+
+              <!-- Mentzer Index Card -->
+              <div class="morphology-card mentzer-card">
+                <div class="morph-header">
+                  <span class="morph-icon">⚖️</span>
+                  <h4>ดัชนีเมนท์เซอร์ (Mentzer Index)</h4>
+                  <span class="mentzer-formula-tag">MCV ÷ RBC</span>
+                </div>
+                <div class="mentzer-score-row">
+                  <div class="mentzer-score-val" id="mentzer-val">-</div>
+                  <div class="mentzer-score-scale">
+                    <span class="scale-label-left">&lt; 13: ธาลัสซีเมีย</span>
+                    <span class="scale-label-right">&gt; 13: ขาดธาตุเหล็ก</span>
+                  </div>
+                </div>
+                <p class="mentzer-explanation" id="mentzer-desc">
+                  ดัชนีช่วยคัดกรองเบื้องต้นระหว่างพาหะธาลัสซีเมียและภาวะขาดธาตุเหล็ก
+                </p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- AI Consultation & Gemini Section -->
+        <article class="card ai-card" id="ai-section">
+          <div class="card-header ai-header">
+            <div class="card-title-group">
+              <div class="gemini-sparkle-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" class="sparkle-svg">
+                  <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="url(#gemini-sparkle-grad)" />
+                  <defs>
+                    <linearGradient id="gemini-sparkle-grad" x1="2" y1="2" x2="22" y2="22">
+                      <stop offset="0%" stop-color="#38bdf8" />
+                      <stop offset="50%" stop-color="#818cf8" />
+                      <stop offset="100%" stop-color="#c084fc" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <div>
+                <div class="ai-title-row">
+                  <h3 class="card-title">บทวิเคราะห์ทางโลหิตวิทยาโดย Gemini AI</h3>
+                  <span class="model-badge" id="active-model-badge">Gemini 3.8 Flash</span>
+                </div>
+                <p class="card-desc">วิเคราะห์สาเหตุ โรคที่อาจสัมพันธ์ พร้อมแนะนำการตรวจทางห้องปฏิบัติการเพิ่มเติม</p>
+              </div>
+            </div>
+
+            <div class="ai-controls">
+              <button id="btn-trigger-ai" class="btn btn-sm btn-gemini">
+                <span>⚡ ส่งผลให้ AI วิเคราะห์</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- AI Output Container -->
+          <div class="ai-content-wrapper">
+            <!-- Initial prompt state -->
+            <div class="ai-placeholder" id="ai-placeholder-view">
+              <div class="ai-placeholder-icon">🤖</div>
+              <h4>ยังไม่มีการวิเคราะห์จาก AI</h4>
+              <p>กดปุ่ม <strong>"ส่งผลให้ AI วิเคราะห์"</strong> เพื่อให้ Gemini หรือโมเดลผู้เชี่ยวชาญโลหิตวิทยาประเมินผลเลือด วินิจฉัยแยกโรค และแนะนำการตรวจเพิ่มเติม</p>
+              <div class="ai-mode-tips">
+                <span>💡 <strong>เคล็ดลับ:</strong> หากใส่ Gemini API Key จะวิเคราะห์แบบ Live Real-time หากไม่ได้ใส่ ระบบจะใช้ <em>Expert Offline Hematology Engine</em> เพื่อให้ใช้งานได้ทันที</span>
+              </div>
+            </div>
+
+            <!-- Loading Skeleton State -->
+            <div class="ai-loading-state" id="ai-loading-view" style="display: none;">
+              <div class="ai-loading-spinner"></div>
+              <p class="ai-loading-text">กำลังเชื่อมต่อและประมวลผลการวิเคราะห์ทางโลหิตวิทยา...</p>
+              <div class="skeleton-block">
+                <div class="skeleton-line full"></div>
+                <div class="skeleton-line long"></div>
+                <div class="skeleton-line medium"></div>
+                <div class="skeleton-line short"></div>
+              </div>
+            </div>
+
+            <!-- Rendered AI Markdown Content -->
+            <div class="ai-markdown-rendered markdown-body" id="ai-markdown-output" style="display: none;">
+              <!-- Markdown content inserted here -->
+            </div>
+          </div>
+
+          <!-- Prominent Medical Disclaimer (ข้อความเตือนทางการแพทย์) -->
+          <div class="medical-disclaimer-card" role="alert">
+            <div class="disclaimer-icon-wrapper">
+              <span class="disclaimer-icon">⚠️</span>
+            </div>
+            <div class="disclaimer-text">
+              <h4 class="disclaimer-title">ข้อความเตือนทางการแพทย์ (Medical Disclaimer)</h4>
+              <p>
+                ข้อมูลและการวิเคราะห์ที่แสดงในระบบนี้จัดทำขึ้นเพื่อการศึกษา การสนับสนุนการเรียนรู้ทางโลหิตวิทยา (Hematology) และการคำนวณเบื้องต้นเท่านั้น 
+                <strong>ไม่สามารถนำมาใช้ทดแทนการวินิจฉัย การตรวจรักษา หรือคำแนะนำทางการแพทย์โดยแพทย์ผู้เชี่ยวชาญได้</strong> 
+                การแปลผลเลือดต้องพิจารณาร่วมกับอาการ ประวัติการรักษา การตรวจร่างกาย และการตรวจทางห้องปฏิบัติการอื่นๆ อย่างครอบคลุม หากท่านมีข้อกังวลหรือผลการตรวจผิดปกติ โปรดปรึกษาแพทย์หรือบุคลากรทางการแพทย์โดยตรง
+              </p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <!-- Formula & Hemocytometer Math Modal -->
+    <div class="modal-backdrop" id="formula-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 class="modal-title">📐 สูตรคำนวณดัชนีเม็ดเลือดแดงและที่มา</h3>
+          <button type="button" class="btn-close-modal" id="btn-close-formula" aria-label="ปิด">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="formula-item">
+            <h4>1. การแปลงหน่วย RBC Count จาก Hemocytometer</h4>
+            <p>เมื่อนับเม็ดเลือดแดงใน 5 ช่องกลางของ Hemocytometer ที่อัตราเจือจาง 1:200:</p>
+            <div class="math-box">
+              $$\text{RBC Count } (10^6/\mu\text{L}) = \frac{\text{Cells ที่นับได้ใน 5 ช่อง}}{100}$$
+            </div>
+            <p class="formula-subdetail">
+              <strong>ที่มา:</strong> ปริมาตรของ 5 ช่อง = 0.02 µL, เจือจาง 1:200 $\Rightarrow$ ตัวคูณคือ 10,000 / µL<br>
+              ดังนั้น $\text{Count} \times 10,000 \text{ cells}/\mu\text{L} = \frac{\text{Count}}{100} \times 10^6/\mu\text{L}$
+            </p>
+          </div>
+
+          <div class="formula-item">
+            <h4>2. Mean Corpuscular Volume (MCV)</h4>
+            <div class="math-box">
+              $$\text{MCV (fL)} = \frac{\text{Hct (\%)} \times 10}{\text{RBC } (10^6/\mu\text{L})}$$
+            </div>
+            <p><strong>เกณฑ์ปกติ:</strong> 80.0 – 100.0 fL (ปริมาตรเฉลี่ยของเม็ดเลือดแดงหนึ่งเซลล์)</p>
+          </div>
+
+          <div class="formula-item">
+            <h4>3. Mean Corpuscular Hemoglobin (MCH)</h4>
+            <div class="math-box">
+              $$\text{MCH (pg)} = \frac{\text{Hb (g/dL)} \times 10}{\text{RBC } (10^6/\mu\text{L})}$$
+            </div>
+            <p><strong>เกณฑ์ปกติ:</strong> 27.0 – 31.0 pg (น้ำหนักฮีโมโกลบินเฉลี่ยในเม็ดเลือดแดงหนึ่งเซลล์)</p>
+          </div>
+
+          <div class="formula-item">
+            <h4>4. Mean Corpuscular Hemoglobin Concentration (MCHC)</h4>
+            <div class="math-box">
+              $$\text{MCHC (g/dL)} = \frac{\text{Hb (g/dL)} \times 100}{\text{Hct (\%)'}}$$
+            </div>
+            <p><strong>เกณฑ์ปกติ:</strong> 32.0 – 36.0 g/dL (ความเข้มข้นเฉลี่ยของฮีโมโกลบินในปริมาตรเม็ดเลือดแดง)</p>
+          </div>
+
+          <div class="formula-item">
+            <h4>5. Mentzer Index (การวินิจฉัยแยกโรค)</h4>
+            <div class="math-box">
+              $$\text{Mentzer Index} = \frac{\text{MCV}}{\text{RBC}}$$
+            </div>
+            <p>&lt; 13 บ่งชี้ไปทาง <strong>Thalassemia Trait</strong> | &gt; 13 บ่งชี้ไปทาง <strong>Iron Deficiency Anemia</strong></p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-ok-formula">เข้าใจแล้ว</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Key Configuration Modal -->
+    <div class="modal-backdrop" id="api-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-with-icon">
+            <span class="modal-icon">⚙️</span>
+            <div>
+              <h3 class="modal-title">ตั้งค่า Google Gemini API</h3>
+              <p class="modal-subtitle">บันทึกใน LocalStorage ของเบราว์เซอร์ส่วนตัวของคุณ ปลอดภัย 100%</p>
+            </div>
+          </div>
+          <button type="button" class="btn-close-modal" id="btn-close-api-modal" aria-label="ปิด">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="modal-input-api-key" class="form-label">
+              <span>Gemini API Key</span>
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="link-external">
+                รับคีย์ฟรีจาก Google AI Studio ↗
+              </a>
+            </label>
+            <div class="input-wrapper">
+              <input 
+                type="password" 
+                id="modal-input-api-key" 
+                class="form-control" 
+                placeholder="AIzaSy..." 
+                autocomplete="off"
+              >
+              <button type="button" id="btn-toggle-key-visibility" class="btn-suffix-action" title="แสดง/ซ่อนคีย์">
+                👁️
+              </button>
+            </div>
+            <span class="form-hint">หากเว้นว่างไว้ ระบบจะใช้โหมด Offline Hematology Expert วิเคราะห์ให้โดยอัตโนมัติ</span>
+          </div>
+
+          <div class="form-group">
+            <label for="modal-select-model" class="form-label">โมเดล AI ที่ต้องการใช้งาน</label>
+            <select id="modal-select-model" class="form-control select-control">
+              <option value="gemini-3.8-flash">Gemini 3.8 Flash (แนะนำล่าสุด - ประสิทธิภาพและตรรกะสูงสุด)</option>
+              <option value="gemini-3.6-flash">Gemini 3.6 Flash (ประมวลผลเร็วพิเศษ)</option>
+              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite (เร็ว เบา ประหยัดโทเคน)</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro (วิเคราะห์เชิงลึก)</option>
+            </select>
+          </div>
+
+          <div class="api-modal-info">
+            <div class="info-badge-row">
+              <span class="info-badge-icon">🔒</span>
+              <p>คีย์ของคุณจะถูกเก็บไว้เฉพาะในเบราว์เซอร์ของคุณเท่านั้น ไม่มีการส่งไปเก็บบนเซิร์ฟเวอร์ภายนอกใดๆ ทั้งสิ้น</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="btn-clear-api-key" class="btn btn-danger-outline">ลบคีย์ออกจากเครื่อง</button>
+          <div class="modal-footer-right">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-api-modal">ยกเลิก</button>
+            <button type="button" class="btn btn-primary" id="btn-save-api-key">บันทึกการตั้งค่า</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container" aria-live="assertive"></div>
+  </div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
